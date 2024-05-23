@@ -11,6 +11,15 @@ public class HttpRequestor
 
     public string? BodyText { get; internal set; } = null!;
 
+    /// <summary>
+    /// How long should responses be unconditionally cached for?
+    /// </summary>
+    public TimeSpan CacheExpiration
+    {
+        get => Cache.EntryLifespan;
+        set => Cache.EntryLifespan = value;
+    }
+        
     public long DownloadTimeMs
         => (long)RequestStopwatch.ElapsedMilliseconds;
 
