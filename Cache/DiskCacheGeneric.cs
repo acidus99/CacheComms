@@ -4,18 +4,8 @@ namespace CacheComms;
 
 public class DiskCache<T> : AbstractDiskCache
 {
-    public DiskCache(string nameSpace = AbstractDiskCache.DefaultNamespace)
-    : this(nameSpace, AbstractDiskCache.DefaultLifetime)
-    {
-    }
-
-    public DiskCache(TimeSpan lifetime)
-    : this(AbstractDiskCache.DefaultNamespace, lifetime)
-    {
-    }
-
-    public DiskCache(string nameSpace, TimeSpan lifetime)
-        : base(nameSpace, lifetime)
+    public DiskCache(string nameSpace)
+        : base(nameSpace)
     {
     }
 

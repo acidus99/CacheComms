@@ -9,15 +9,17 @@ public abstract class AbstractDiskCache
 
     public static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(2);
 
-    protected TimeSpan Lifespan;
+    /// <summary>
+    /// How log should a cache entry be valid for?
+    /// </summary>
+    public TimeSpan EntryLifespan { get; set; } = DefaultLifetime;
     protected object locker;
 
     private string Namespace;
 
-    public AbstractDiskCache(string nameSpace, TimeSpan lifetime)
+    public AbstractDiskCache(string nameSpace)
     {
         Namespace= nameSpace;
-        Lifespan = lifetime;
         locker = new object();
     }
 
@@ -47,7 +49,7 @@ public abstract class AbstractDiskCache
 
         try
         {
-            isValid = (File.GetLastWriteTime(filepath) >= DateTime.Now.Subtract(Lifespan));
+            isValid = (File.GetLastWriteTime(filepath) >= DateTime.Now.Subtract(EntryLifespan));
             if(!isValid)
             {
                 //even if the delete fails, we still return if its valid

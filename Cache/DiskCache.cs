@@ -4,17 +4,7 @@ public class DiskCache : AbstractDiskCache
 {
 
     public DiskCache(string nameSpace = AbstractDiskCache.DefaultNamespace)
-        : this(nameSpace, AbstractDiskCache.DefaultLifetime)
-    {
-    }
-
-    public DiskCache(TimeSpan lifetime)
-    : this(AbstractDiskCache.DefaultNamespace, lifetime)
-    {
-    }
-
-    public DiskCache(string nameSpace, TimeSpan lifetime)
-        :base(nameSpace, lifetime)
+        : base(nameSpace)
     {
     }
 
