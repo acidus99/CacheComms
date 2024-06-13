@@ -12,6 +12,12 @@ public class HttpRequestor
     public string? BodyText { get; internal set; } = null!;
 
     /// <summary>
+    /// What was the URL of the final request. We need to expose this because
+    /// we automatically follow redirects.
+    /// </summary>
+    public Uri? RequestUri { get; private set; } = null;
+
+    /// <summary>
     /// How long should responses be unconditionally cached for?
     /// </summary>
     public TimeSpan CacheExpiration
@@ -46,10 +52,12 @@ public class HttpRequestor
     }
 
     [MemberNotNullWhen(true, nameof(BodyBytes))]
-    public bool GetAsBytes(Uri url, bool useCache = true)
+    public bool GetAsBytes(Uri originalUrl, bool useCache = true)
     {
+        //assume where we end up is where we started
+        RequestUri = originalUrl;
         RequestStopwatch.Restart();
-        if (!IsValidUrl(url))
+        if (!IsValidUrl(originalUrl))
         {
             return false;
         }
@@ -57,7 +65,7 @@ public class HttpRequestor
         if (useCache)
         {
             //try and get it from the cache
-            string key = GetCacheKey(url);
+            string key = GetCacheKey(originalUrl);
             var content = Cache.GetAsBytes(key);
 
             if (content != null)
@@ -71,7 +79,7 @@ public class HttpRequestor
         HttpResponseMessage httpResponse;
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var request = new HttpRequestMessage(HttpMethod.Get, originalUrl);
             httpResponse = Client.Send(request, HttpCompletionOption.ResponseContentRead);
             RequestStopwatch.Stop();
         }
@@ -88,6 +96,12 @@ public class HttpRequestor
             return false;
         }
 
+        //update the final URL, in case we went through a redirect
+        if (httpResponse.RequestMessage != null)
+        {
+            RequestUri = httpResponse.RequestMessage.RequestUri;
+        }
+
         if (!httpResponse.IsSuccessStatusCode)
         {
             ErrorMessage = $"Could not download content for URL. Status code: '{httpResponse.StatusCode}'";
@@ -98,24 +112,29 @@ public class HttpRequestor
 
         if (BodyBytes.Length == 0)
         {
-            ErrorMessage = $"Received no binary content for '{url}'";
+            ErrorMessage = $"Received no binary content for '{RequestUri}'";
             return false;
         }
 
-        if (useCache)
+        //our cache only stores the contents of the URL. we have no way to persist
+        //the final URL if we went through a redirect chain. This means we can't cache
+        //any URL that has a redirect, which is fine for now
+        if (useCache && !RequestFollowedRedirect(originalUrl, httpResponse))
         {
             //ok, we are good, store this in the cache
-            string key = GetCacheKey(url);
+            string key = GetCacheKey(originalUrl);
             Cache.Set(key, BodyBytes);
         }
         return true;
     }
 
     [MemberNotNullWhen(true, nameof(BodyText))]
-    public bool GetAsString(Uri url, bool useCache = true)
+    public bool GetAsString(Uri originalUrl, bool useCache = true)
     {
+        //assume where we end up is where we started
+        RequestUri = originalUrl;
         RequestStopwatch.Restart();
-        if (!IsValidUrl(url))
+        if (!IsValidUrl(originalUrl))
         {
             return false;
         }
@@ -123,7 +142,7 @@ public class HttpRequestor
         if (useCache)
         {
             //try and get it from the cache
-            string key = GetCacheKey(url);
+            string key = GetCacheKey(originalUrl);
             var content = Cache.GetAsString(key);
 
             if (content != null)
@@ -137,7 +156,7 @@ public class HttpRequestor
         HttpResponseMessage httpResponse;
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            var request = new HttpRequestMessage(HttpMethod.Get, originalUrl);
             httpResponse = Client.Send(request, HttpCompletionOption.ResponseContentRead);
             RequestStopwatch.Stop();
         }
@@ -154,6 +173,12 @@ public class HttpRequestor
             return false;
         }
 
+        //update the final URL, in case we went through a redirect
+        if (httpResponse.RequestMessage != null)
+        {
+            RequestUri = httpResponse.RequestMessage.RequestUri;
+        }
+
         if (!httpResponse.IsSuccessStatusCode)
         {
             ErrorMessage = $"Could not download content for URL. Status code: '{httpResponse.StatusCode}'";
@@ -165,14 +190,17 @@ public class HttpRequestor
         BodyText = Encoding.GetEncoding(charset).GetString(BodyBytes);
         if (string.IsNullOrEmpty(BodyText))
         {
-            ErrorMessage = $"Received no text content for '{url}'";
+            ErrorMessage = $"Received no text content for '{RequestUri}'";
             return false;
         }
 
-        if (useCache)
+        //our cache only stores the contents of the URL. we have no way to persist
+        //the final URL if we went through a redirect chain. This means we can't cache
+        //any URL that has a redirect, which is fine for now
+        if (useCache && !RequestFollowedRedirect(originalUrl, httpResponse))
         {
             //ok, we are good, store this in the cache
-            string key = GetCacheKey(url);
+            string key = GetCacheKey(originalUrl);
             Cache.Set(key, BodyText);
         }
         return true;
@@ -199,4 +227,14 @@ public class HttpRequestor
 
     private static string GetCacheKey(Uri url)
         => url.AbsoluteUri;
+
+    /// <summary>
+    /// Did we follow a redirect? Technically, did we end up at a different URL than our original
+    /// requested URL.
+    /// </summary>
+    /// <param name="originalUrl"></param>
+    /// <param name="response"></param>
+    /// <returns></returns>
+    private static bool RequestFollowedRedirect(Uri originalUrl, HttpResponseMessage response)
+        => response.RequestMessage != null && response.RequestMessage.RequestUri != originalUrl;
 }
