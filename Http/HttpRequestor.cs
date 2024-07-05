@@ -12,6 +12,12 @@ public class HttpRequestor
     public string? BodyText { get; internal set; } = null!;
 
     /// <summary>
+    /// The size of the body, in bytes. Note, for text bodies coming from the cache, the
+    /// encoding has be converted to UTF-8, so the byte count might be different then the size of the body
+    /// </summary>
+    public int? BodySize { get; internal set; } = null;
+
+    /// <summary>
     /// What was the URL of the final request. We need to expose this because
     /// we automatically follow redirects.
     /// </summary>
@@ -71,6 +77,7 @@ public class HttpRequestor
             if (content != null)
             {
                 BodyBytes = content;
+                BodySize = content.Length;
                 RequestStopwatch.Stop();
                 return true;
             }
@@ -109,6 +116,7 @@ public class HttpRequestor
         }
 
         BodyBytes = httpResponse.Content.ReadAsByteArrayAsync().Result;
+        BodySize = BodyBytes.Length;
 
         if (BodyBytes.Length == 0)
         {
@@ -148,6 +156,7 @@ public class HttpRequestor
             if (content != null)
             {
                 BodyText = content;
+                BodySize = Encoding.UTF8.GetByteCount(content);
                 RequestStopwatch.Stop();
                 return true;
             }
@@ -186,6 +195,7 @@ public class HttpRequestor
         }
 
         BodyBytes = httpResponse.Content.ReadAsByteArrayAsync().Result;
+        BodySize = BodyBytes.Length;
         var charset = GetCharset(httpResponse.Content.Headers.ContentType);
         BodyText = Encoding.GetEncoding(charset).GetString(BodyBytes);
         if (string.IsNullOrEmpty(BodyText))
